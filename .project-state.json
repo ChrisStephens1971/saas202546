@@ -1,0 +1,66 @@
+{
+  "projectId": "saas202546",
+  "created": "2025-11-14",
+  "templateType": "azure",
+  "version": "2.1",
+  "state": {
+  },
+  "workflow": {
+    "currentPhase": "planning",
+    "phasesCompleted": [],
+    "lastPhaseTransition": null,
+    "checklistSource": ".project-workflow.json"
+  },
+    "hasGreeted": false,
+  },
+  "workflow": {
+    "currentPhase": "planning",
+    "phasesCompleted": [],
+    "lastPhaseTransition": null,
+    "checklistSource": ".project-workflow.json"
+  },
+    "setupComplete": false,
+  },
+  "workflow": {
+    "currentPhase": "planning",
+    "phasesCompleted": [],
+    "lastPhaseTransition": null,
+    "checklistSource": ".project-workflow.json"
+  },
+    "currentSprint": null,
+  },
+  "workflow": {
+    "currentPhase": "planning",
+    "phasesCompleted": [],
+    "lastPhaseTransition": null,
+    "checklistSource": ".project-workflow.json"
+  },
+    "phase": "planning"
+  },
+  "workflow": {
+    "currentPhase": "planning",
+    "phasesCompleted": [],
+    "lastPhaseTransition": null,
+    "checklistSource": ".project-workflow.json"
+  },
+  },
+  "workflow": {
+    "currentPhase": "planning",
+    "phasesCompleted": [],
+    "lastPhaseTransition": null,
+    "checklistSource": ".project-workflow.json"
+  },
+  "metadata": {
+    "tradeName": null,
+    "teamType": null,
+    "multiTenant": true,
+    "tenantModel": "subdomain"
+  },
+  "ports": {
+    "frontend": "3046",
+    "backend": "8046",
+    "postgres": "5446",
+    "redis": "6446",
+    "mongo": "27046"
+  }
+}
