@@ -1,0 +1,63 @@
+version: 2
+updates:
+  # Backend dependencies
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "backend"
+    reviewers:
+      - "backend-team"
+    commit-message:
+      prefix: "chore(backend)"
+      include: "scope"
+
+  # Mobile app dependencies
+  - package-ecosystem: "npm"
+    directory: "/mobile-app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "mobile"
+    reviewers:
+      - "frontend-team"
+    commit-message:
+      prefix: "chore(mobile)"
+      include: "scope"
+
+  # Web admin dependencies
+  - package-ecosystem: "npm"
+    directory: "/web-admin"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "web"
+    reviewers:
+      - "frontend-team"
+    commit-message:
+      prefix: "chore(web)"
+      include: "scope"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "ci-cd"
+    reviewers:
+      - "devops-team"
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"

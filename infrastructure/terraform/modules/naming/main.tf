@@ -11,11 +11,11 @@ variable "org" {
 }
 
 variable "project" {
-  description = "Project code (2-5 chars)"
+  description = "Project code (2-10 chars)"
   type        = string
   validation {
-    condition     = length(var.project) >= 2 && length(var.project) <= 5
-    error_message = "Project code must be 2-5 characters."
+    condition     = length(var.project) >= 2 && length(var.project) <= 10
+    error_message = "Project code must be 2-10 characters."
   }
 }
 

@@ -1,0 +1,24 @@
+# Code Owners for Mobile Mechanic Empire
+# Auto-request reviews from these users when files change
+
+# Global owners
+* @owner
+
+# Backend code
+/backend/ @backend-team
+
+# Frontend code
+/mobile-app/ @frontend-team
+/web-admin/ @frontend-team
+
+# Infrastructure
+/infrastructure/ @devops-team
+/.github/workflows/ @devops-team
+
+# Documentation
+/docs/ @product-team
+/README.md @product-team
+
+# Security and compliance
+/.github/workflows/*security* @security-team
+/infrastructure/azure-security-* @security-team

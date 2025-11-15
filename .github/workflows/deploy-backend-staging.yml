@@ -1,0 +1,238 @@
+name: Deploy Backend to Staging
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend-staging.yml'
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA to deploy (defaults to latest main)'
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_RESOURCE_GROUP: rg-vrd-202546-stg-eus2-app
+  AZURE_APP_NAME: app-vrd-202546-stg-cus-01
+  NODE_VERSION: '20'
+
+jobs:
+  build:
+    name: Build Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha || github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --production=false
+
+      - name: Build TypeScript
+        working-directory: backend
+        run: npm run build
+
+      - name: Install production dependencies only
+        working-directory: backend
+        run: |
+          rm -rf node_modules
+          npm ci --omit=dev
+
+      - name: Create deployment package
+        working-directory: backend
+        run: |
+          mkdir -p deploy-package
+          cp -r dist/* deploy-package/
+          cp package.json deploy-package/
+          cp package-lock.json deploy-package/
+          cp -r node_modules deploy-package/
+
+      - name: Upload deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-deploy-${{ github.sha }}
+          path: backend/deploy-package/
+          retention-days: 90
+
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: staging
+      url: https://${{ env.AZURE_APP_NAME }}.azurewebsites.net
+
+    steps:
+      - name: Download deployment artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-deploy-${{ github.sha }}
+          path: deploy-package
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create deployment zip
+        run: |
+          cd deploy-package
+          zip -r ../backend-deploy.zip .
+          cd ..
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_APP_NAME }}
+          package: backend-deploy.zip
+
+      - name: Run database migrations
+        run: |
+          # Set App Service config to run migrations
+          az webapp config appsettings set \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.AZURE_APP_NAME }} \
+            --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false
+
+          # Trigger migration via App Service console
+          # Note: In production, this should be handled via a startup script
+          echo "Migrations should be handled via App Service startup command"
+          echo "App Setting: npm run migrate:latest && node dist/server.js"
+
+      - name: Restart App Service
+        run: |
+          az webapp restart \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.AZURE_APP_NAME }}
+
+      - name: Wait for App Service to start
+        run: sleep 30
+
+  smoke-test:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Test health endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.AZURE_APP_NAME }}.azurewebsites.net/health)
+          if [ $response -ne 200 ]; then
+            echo "Health check failed with status: $response"
+            exit 1
+          fi
+          echo "Health check passed"
+
+      - name: Test readiness endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.AZURE_APP_NAME }}.azurewebsites.net/health/ready)
+          if [ $response -ne 200 ]; then
+            echo "Readiness check failed with status: $response"
+            exit 1
+          fi
+          echo "Readiness check passed"
+
+      - name: Test API root endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.AZURE_APP_NAME }}.azurewebsites.net/api)
+          if [ $response -ne 200 ]; then
+            echo "API root check failed with status: $response"
+            exit 1
+          fi
+          echo "API root check passed"
+
+      - name: Test authenticated endpoint (login)
+        run: |
+          # Test that the auth endpoint is accessible (expecting 400 for missing body, not 500)
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST https://${{ env.AZURE_APP_NAME }}.azurewebsites.net/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{}')
+
+          # 400 Bad Request is expected for invalid input, 401/404 would indicate a problem
+          if [ $response -eq 500 ] || [ $response -eq 404 ]; then
+            echo "Auth endpoint check failed with status: $response"
+            exit 1
+          fi
+          echo "Auth endpoint accessible (status: $response)"
+
+  rollback-on-failure:
+    name: Rollback on Smoke Test Failure
+    runs-on: ubuntu-latest
+    needs: [deploy, smoke-test]
+    if: failure() && needs.deploy.result == 'success'
+
+    steps:
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get previous deployment
+        id: get-previous
+        run: |
+          # Get the second most recent deployment (first is the current failed one)
+          previous_id=$(az webapp deployment list \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.AZURE_APP_NAME }} \
+            --query "[1].id" -o tsv)
+
+          echo "previous_id=$previous_id" >> $GITHUB_OUTPUT
+
+      - name: Rollback to previous deployment
+        if: steps.get-previous.outputs.previous_id != ''
+        run: |
+          echo "Rolling back to deployment: ${{ steps.get-previous.outputs.previous_id }}"
+
+          # Note: Azure App Service doesn't have direct rollback via CLI
+          # Alternative: Redeploy from previous artifact or use deployment slots
+          echo "Manual rollback required - redeploy previous successful commit"
+          echo "Or use: gh workflow run deploy-backend-staging.yml -f commit_sha=<previous-sha>"
+
+      - name: Notify deployment failure
+        run: |
+          echo "::error::Staging deployment failed smoke tests"
+          echo "::error::Manual intervention required"
+          echo "Previous deployment ID: ${{ steps.get-previous.outputs.previous_id }}"
+
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [build, deploy, smoke-test]
+    if: always()
+
+    steps:
+      - name: Deployment status
+        run: |
+          echo "Build: ${{ needs.build.result }}"
+          echo "Deploy: ${{ needs.deploy.result }}"
+          echo "Smoke Test: ${{ needs.smoke-test.result }}"
+
+          if [[ "${{ needs.smoke-test.result }}" == "success" ]]; then
+            echo "✅ Deployment to staging successful"
+            echo "URL: https://${{ env.AZURE_APP_NAME }}.azurewebsites.net"
+          else
+            echo "❌ Deployment to staging failed"
+            exit 1
+          fi

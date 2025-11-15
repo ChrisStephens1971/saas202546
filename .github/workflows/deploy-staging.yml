@@ -1,0 +1,79 @@
+name: Deploy to Azure Staging
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-staging.yml'
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  AZURE_WEBAPP_NAME: app-vrd-202546-stg-eus2-01
+  NODE_VERSION: '20'
+
+jobs:
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://app-vrd-202546-stg-eus2-01.azurewebsites.net
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --omit=dev
+
+      - name: Build project
+        working-directory: backend
+        run: npm run build
+
+      - name: Create deployment package
+        working-directory: backend
+        run: |
+          mkdir -p deploy
+          cp -r dist deploy/
+          cp package.json deploy/
+          cp package-lock.json deploy/
+          cd deploy && npm ci --omit=dev
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_STAGING }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: backend/deploy
+
+      - name: Run database migrations
+        run: |
+          echo "⚠️ Database migrations should be run manually or via Azure CLI"
+          # az webapp ssh --name ${{ env.AZURE_WEBAPP_NAME }} --command "npm run migrate:latest"
+
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f https://app-vrd-202546-stg-eus2-01.azurewebsites.net/health || exit 1
+
+      - name: Notification
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment to staging successful"
+          else
+            echo "❌ Deployment to staging failed"
+          fi

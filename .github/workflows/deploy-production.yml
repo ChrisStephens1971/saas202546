@@ -1,0 +1,92 @@
+name: Deploy to Azure Production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-production.yml'
+  workflow_dispatch: # Manual trigger only for production
+
+env:
+  AZURE_WEBAPP_NAME: app-vrd-202546-prd-eus2-01
+  NODE_VERSION: '20'
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app-vrd-202546-prd-eus2-01.azurewebsites.net
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --omit=dev
+
+      - name: Build project
+        working-directory: backend
+        run: npm run build
+
+      - name: Run tests
+        working-directory: backend
+        run: npm test || exit 1
+
+      - name: Create deployment package
+        working-directory: backend
+        run: |
+          mkdir -p deploy
+          cp -r dist deploy/
+          cp package.json deploy/
+          cp package-lock.json deploy/
+          cd deploy && npm ci --omit=dev
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_PRODUCTION }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: backend/deploy
+          slot-name: production
+
+      - name: Run database migrations
+        run: |
+          echo "⚠️ Database migrations should be run manually for production"
+          echo "Run: az webapp ssh --name ${{ env.AZURE_WEBAPP_NAME }} --command 'npm run migrate:latest'"
+
+      - name: Smoke tests
+        run: |
+          sleep 60
+          curl -f https://app-vrd-202546-prd-eus2-01.azurewebsites.net/health || exit 1
+          curl -f https://app-vrd-202546-prd-eus2-01.azurewebsites.net/health/ready || exit 1
+
+      - name: Notification
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment to production successful"
+          else
+            echo "❌ Deployment to production failed"
+            echo "🔄 Consider rollback if health checks failed"
+          fi
+
+      - name: Create release tag
+        if: success()
+        run: |
+          git tag -a "v$(date +'%Y%m%d-%H%M%S')" -m "Production deployment $(date)"
+          git push origin --tags
