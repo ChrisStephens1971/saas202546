@@ -587,6 +587,31 @@ az keyvault set-policy \
 
 ---
 
+## Deployment Package Structure
+
+**ZIP Package Root Layout** (required for App Service startup):
+
+```
+backend-deploy.zip
+├── package.json          # At ZIP root (required by npm commands)
+├── package-lock.json     # At ZIP root
+├── dist/                 # Build output folder
+│   ├── server.js        # Entry point (referenced in startup command)
+│   ├── config/
+│   ├── modules/
+│   └── ...
+└── node_modules/         # Production dependencies
+    └── ...
+```
+
+**Key Requirement**: The App Service startup command `npm run migrate:latest && node dist/server.js` expects:
+- `package.json` at `/home/site/wwwroot/package.json`
+- Compiled code at `/home/site/wwwroot/dist/server.js`
+
+The GitHub Actions workflow builds from `backend/` and creates a deployment ZIP with this exact structure. The workflow includes a verification step to confirm the ZIP structure before deployment.
+
+---
+
 **Deployment Completed**: 2025-11-15 18:00 UTC
 **App Service URL**: https://app-vrd-202546-stg-cus-01.azurewebsites.net
 **Status**: Ready for application deployment
