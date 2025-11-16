@@ -119,11 +119,12 @@ jobs:
       - name: Run database migrations
         working-directory: deploy-package
         run: |
-          # Get database connection string from App Service
-          DB_URL=$(az webapp config appsettings list \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --name ${{ env.AZURE_APP_NAME }} \
-            --query "[?name=='DATABASE_URL'].value | [0]" -o tsv)
+          # Get database connection string from Key Vault
+          # The App Service setting points to Key Vault, so we need to retrieve the actual secret
+          DB_URL=$(az keyvault secret show \
+            --vault-name kv-vrd-202546-stg-eus2 \
+            --name DATABASE-URL \
+            --query "value" -o tsv)
 
           # Run migrations using npm script
           export DATABASE_URL="$DB_URL"
