@@ -124,7 +124,7 @@ jobs:
           cd deploy-package
           export DATABASE_URL="$DB_URL"
           export NODE_ENV=staging
-          npm run migrate:latest
+          ./node_modules/.bin/knex migrate:latest
           cd ..
 
       - name: Deploy to Azure App Service
