@@ -101,7 +101,7 @@ jobs:
         run: npm run test:integration || echo "⚠️ Integration tests not configured yet"
 
       - name: Upload test coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         if: success()
         with:
           files: ./backend/coverage/lcov.info
