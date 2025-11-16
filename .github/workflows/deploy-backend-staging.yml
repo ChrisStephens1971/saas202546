@@ -49,19 +49,6 @@ jobs:
         working-directory: backend
         run: npm run build
 
-      - name: Compile knexfile for deployment
-        working-directory: backend
-        run: |
-          # Compile knexfile.ts to CommonJS (needs esModuleInterop for default imports)
-          npx tsc knexfile.ts \
-            --module commonjs \
-            --target ES2022 \
-            --moduleResolution node \
-            --esModuleInterop \
-            --skipLibCheck \
-            --declaration false \
-            --sourceMap false
-
       - name: Create deployment package
         working-directory: backend
         run: |
@@ -69,7 +56,8 @@ jobs:
           cp -r dist deploy-package/
           cp package.json deploy-package/
           cp package-lock.json deploy-package/
-          cp knexfile.js deploy-package/
+          # Use pure JavaScript knexfile (no TypeScript compilation needed)
+          cp knexfile-production.js deploy-package/knexfile.js
 
       - name: Upload deployment artifact
         uses: actions/upload-artifact@v4
