@@ -52,11 +52,12 @@ jobs:
       - name: Compile knexfile for deployment
         working-directory: backend
         run: |
-          # Compile knexfile.ts with explicit CommonJS output
+          # Compile knexfile.ts to CommonJS (needs esModuleInterop for default imports)
           npx tsc knexfile.ts \
             --module commonjs \
             --target ES2022 \
             --moduleResolution node \
+            --esModuleInterop \
             --skipLibCheck \
             --declaration false \
             --sourceMap false
