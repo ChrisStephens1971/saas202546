@@ -88,6 +88,12 @@ jobs:
           cache: 'npm'
           cache-dependency-path: deploy-package/package-lock.json
 
+      - name: Configure package for CommonJS
+        working-directory: deploy-package
+        run: |
+          # Explicitly set package type to commonjs to prevent ES module detection
+          node -e "const pkg = require('./package.json'); pkg.type = 'commonjs'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+
       - name: Install production dependencies
         working-directory: deploy-package
         run: npm ci --omit=dev
