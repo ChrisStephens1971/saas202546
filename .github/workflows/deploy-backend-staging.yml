@@ -49,6 +49,15 @@ jobs:
         working-directory: backend
         run: npm run build
 
+      - name: Remove TypeScript artifacts from dist
+        working-directory: backend
+        run: |
+          # Remove .d.ts and .js.map files that might confuse Node's module detection
+          find dist -name "*.d.ts" -delete
+          find dist -name "*.d.ts.map" -delete
+          find dist -name "*.js.map" -delete
+          echo "Removed TypeScript declaration files and source maps"
+
       - name: Create deployment package
         working-directory: backend
         run: |
