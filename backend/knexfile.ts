@@ -83,4 +83,6 @@ const config: { [key: string]: Knex.Config } = {
   }
 }
 
+// Use module.exports for better CommonJS compatibility
+module.exports = config
 export default config
