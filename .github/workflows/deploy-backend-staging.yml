@@ -59,6 +59,13 @@ jobs:
           rm -rf node_modules
           npm ci --omit=dev
 
+      - name: Debug - Check if knex is installed
+        working-directory: backend
+        run: |
+          echo "Checking for knex installation..."
+          ls -la node_modules/ | grep knex || echo "knex not found in node_modules"
+          ls -la node_modules/.bin/ | grep knex || echo "knex binary not found in node_modules/.bin"
+
       - name: Create deployment package
         working-directory: backend
         run: |
