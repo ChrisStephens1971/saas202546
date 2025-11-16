@@ -21,8 +21,12 @@
     "test:coverage": "jest --coverage",
     "migrate:latest": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
+    "migrate:status": "knex migrate:status",
     "migrate:make": "knex migrate:make",
+    "migrate:dev": "cross-env NODE_ENV=development knex migrate:latest",
     "migrate:test": "cross-env NODE_ENV=test knex migrate:latest",
+    "migrate:staging": "cross-env NODE_ENV=staging knex migrate:latest",
+    "migrate:production": "cross-env NODE_ENV=production knex migrate:latest",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "create-tenant": "tsx scripts/create-tenant.ts"
   },

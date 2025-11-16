@@ -53,19 +53,6 @@ jobs:
         working-directory: backend
         run: npx tsc knexfile.ts --module commonjs --target ES2022 --esModuleInterop --skipLibCheck
 
-      - name: Install production dependencies only
-        working-directory: backend
-        run: |
-          rm -rf node_modules
-          npm ci --omit=dev
-
-      - name: Debug - Check if knex is installed
-        working-directory: backend
-        run: |
-          echo "Checking for knex installation..."
-          ls -la node_modules/ | grep knex || echo "knex not found in node_modules"
-          ls -la node_modules/.bin/ | grep knex || echo "knex binary not found in node_modules/.bin"
-
       - name: Create deployment package
         working-directory: backend
         run: |
@@ -74,7 +61,6 @@ jobs:
           cp package.json deploy-package/
           cp package-lock.json deploy-package/
           cp knexfile.js deploy-package/
-          cp -r node_modules deploy-package/
 
       - name: Upload deployment artifact
         uses: actions/upload-artifact@v4
@@ -98,6 +84,17 @@ jobs:
           name: backend-deploy-${{ github.sha }}
           path: deploy-package
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: deploy-package/package-lock.json
+
+      - name: Install production dependencies
+        working-directory: deploy-package
+        run: npm ci --omit=dev
+
       - name: Azure Login via OIDC
         uses: azure/login@v2
         with:
@@ -120,6 +117,7 @@ jobs:
           unzip -l backend-deploy.zip | grep -E "^\s+[0-9]+\s+[0-9-]+\s+[0-9:]+\s+(package\.json|dist/)" || echo "WARNING: Missing required files"
 
       - name: Run database migrations
+        working-directory: deploy-package
         run: |
           # Get database connection string from App Service
           DB_URL=$(az webapp config appsettings list \
@@ -127,12 +125,9 @@ jobs:
             --name ${{ env.AZURE_APP_NAME }} \
             --query "[?name=='DATABASE_URL'].value | [0]" -o tsv)
 
-          # Run migrations using the deployment package
-          cd deploy-package
+          # Run migrations using npm script
           export DATABASE_URL="$DB_URL"
-          export NODE_ENV=staging
-          ./node_modules/.bin/knex migrate:latest
-          cd ..
+          npm run migrate:staging
 
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3

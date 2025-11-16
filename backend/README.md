@@ -203,21 +203,139 @@ npm run format           # Format code with Prettier
 
 ## Database Migrations
 
-Migrations are managed with Knex.js.
+Migrations are managed with Knex.js and run automatically during deployments.
+
+### Migration Scripts
+
+Environment-specific migration commands:
 
 ```bash
-# Create a new migration
-npx knex migrate:make migration_name
+# Development (local) - Uses TypeScript migrations in src/database/migrations
+npm run migrate:dev
+
+# Test - Uses TypeScript migrations in src/database/migrations
+npm run migrate:test
+
+# Staging - Uses compiled JavaScript migrations in dist/database/migrations
+npm run migrate:staging
+
+# Production - Uses compiled JavaScript migrations in dist/database/migrations
+npm run migrate:production
+
+# Generic (uses NODE_ENV from environment)
+npm run migrate:latest
+npm run migrate:rollback
+npm run migrate:status
+```
+
+### Creating Migrations
+
+```bash
+# Create a new migration file
+npm run migrate:make migration_name
+
+# Example: Create users table
+npm run migrate:make create_users_table
+```
+
+This creates a new TypeScript file in `src/database/migrations/`.
+
+### Knexfile Environments
+
+The `knexfile.ts` defines four environments:
+
+| Environment | Migrations Location | Format | Connection |
+|-------------|---------------------|--------|------------|
+| `development` | `./src/database/migrations` | TypeScript (`.ts`) | `DATABASE_URL` or local default |
+| `test` | `./src/database/migrations` | TypeScript (`.ts`) | `DATABASE_URL` or test DB |
+| `staging` | `./dist/database/migrations` | JavaScript (`.js`) | `DATABASE_URL` (required) |
+| `production` | `./dist/database/migrations` | JavaScript (`.js`) | `DATABASE_URL` (required) |
+
+**Key Points:**
+- **Development/Test**: Run directly from TypeScript source files
+- **Staging/Production**: Run from compiled JavaScript (requires `npm run build` first)
+- All environments read connection strings from `DATABASE_URL` environment variable
+
+### Running Migrations Locally
+
+**Development**:
+```bash
+# Set your local database URL
+export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/mobile_mechanic_dev"
 
 # Run migrations
+npm run migrate:dev
+
+# Or use the generic command (will use NODE_ENV=development by default)
 npm run migrate:latest
-
-# Rollback last migration
-npm run migrate:rollback
-
-# Check migration status
-npx knex migrate:status
 ```
+
+**Testing Against Staging Database** (not recommended for regular use):
+```bash
+# Get DATABASE_URL from Azure App Service
+export DATABASE_URL="<staging-database-url>"
+
+# Compile TypeScript first
+npm run build
+
+# Run staging migrations
+npm run migrate:staging
+```
+
+### CI/CD Migrations
+
+Migrations run automatically in the **Deploy Backend to Staging** workflow:
+
+1. **Build Job**:
+   - Compiles TypeScript (`npm run build`)
+   - Compiles `knexfile.ts` → `knexfile.js`
+   - Creates deployment artifact with: `dist/`, `package.json`, `package-lock.json`, `knexfile.js`
+
+2. **Deploy Job**:
+   - Downloads artifact
+   - Installs production dependencies: `npm ci --omit=dev`
+   - Retrieves `DATABASE_URL` from Azure App Service
+   - Runs migrations: `npm run migrate:staging`
+   - Deploys application to Azure
+
+**Environment Variables Set in CI**:
+- `DATABASE_URL`: Retrieved from Azure App Service settings
+- `NODE_ENV=staging`: Set by the `migrate:staging` script
+
+### Migration Best Practices
+
+1. **Always test migrations locally** before pushing:
+   ```bash
+   npm run migrate:dev
+   npm run migrate:rollback  # Test rollback
+   npm run migrate:dev       # Re-apply
+   ```
+
+2. **Migrations should be idempotent** - safe to run multiple times
+
+3. **Never modify existing migrations** - create new ones instead
+
+4. **Always provide a `down()` function** for rollbacks
+
+5. **Test with production-like data** before deploying to production
+
+### Troubleshooting
+
+**"knex: command not found"**:
+- Solution: Use npm scripts (`npm run migrate:dev`) instead of direct `knex` commands
+
+**"Migration directory not found"**:
+- Development/Test: Ensure `src/database/migrations/` exists
+- Staging/Production: Run `npm run build` first to compile migrations to `dist/`
+
+**"Connection refused"**:
+- Check `DATABASE_URL` environment variable
+- Verify PostgreSQL is running
+- Check firewall/network settings for remote databases
+
+**"SSL required" in staging/production**:
+- Staging/production knexfile configurations include `ssl: { rejectUnauthorized: false }`
+- This is required for Azure PostgreSQL connections
 
 ## Testing
 
