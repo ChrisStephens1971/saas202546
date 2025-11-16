@@ -116,6 +116,18 @@ jobs:
           echo "=== Checking for required files at root ==="
           unzip -l backend-deploy.zip | grep -E "^\s+[0-9]+\s+[0-9-]+\s+[0-9:]+\s+(package\.json|dist/)" || echo "WARNING: Missing required files"
 
+      - name: Debug - Check knexfile
+        working-directory: deploy-package
+        run: |
+          echo "=== Checking knexfile.js exists ==="
+          ls -la knexfile.js || echo "knexfile.js NOT FOUND"
+          echo ""
+          echo "=== Last 10 lines of knexfile.js ==="
+          tail -10 knexfile.js
+          echo ""
+          echo "=== Checking migration files ==="
+          ls -la dist/database/migrations/
+
       - name: Run database migrations
         working-directory: deploy-package
         run: |
