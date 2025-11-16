@@ -49,6 +49,10 @@ jobs:
         working-directory: backend
         run: npm run build
 
+      - name: Compile knexfile for deployment
+        working-directory: backend
+        run: npx tsc knexfile.ts --module commonjs --target ES2022 --esModuleInterop --skipLibCheck
+
       - name: Install production dependencies only
         working-directory: backend
         run: |
@@ -62,6 +66,7 @@ jobs:
           cp -r dist deploy-package/
           cp package.json deploy-package/
           cp package-lock.json deploy-package/
+          cp knexfile.js deploy-package/
           cp -r node_modules deploy-package/
 
       - name: Upload deployment artifact
