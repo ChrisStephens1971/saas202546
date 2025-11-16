@@ -107,24 +107,26 @@ jobs:
           echo "=== Checking for required files at root ==="
           unzip -l backend-deploy.zip | grep -E "^\s+[0-9]+\s+[0-9-]+\s+[0-9:]+\s+(package\.json|dist/)" || echo "WARNING: Missing required files"
 
+      - name: Run database migrations
+        run: |
+          # Get database connection string from App Service
+          DB_URL=$(az webapp config appsettings list \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.AZURE_APP_NAME }} \
+            --query "[?name=='DATABASE_URL'].value | [0]" -o tsv)
+
+          # Run migrations using the deployment package
+          cd deploy-package
+          export DATABASE_URL="$DB_URL"
+          export NODE_ENV=staging
+          npm run migrate:latest
+          cd ..
+
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_APP_NAME }}
           package: backend-deploy.zip
-
-      - name: Run database migrations
-        run: |
-          # Set App Service config to run migrations
-          az webapp config appsettings set \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --name ${{ env.AZURE_APP_NAME }} \
-            --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false
-
-          # Trigger migration via App Service console
-          # Note: In production, this should be handled via a startup script
-          echo "Migrations should be handled via App Service startup command"
-          echo "App Setting: npm run migrate:latest && node dist/server.js"
 
       - name: Restart App Service
         run: |
