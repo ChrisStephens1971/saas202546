@@ -51,7 +51,15 @@ jobs:
 
       - name: Compile knexfile for deployment
         working-directory: backend
-        run: npx tsc knexfile.ts --module commonjs --target ES2022 --esModuleInterop --skipLibCheck
+        run: |
+          # Compile knexfile.ts with explicit CommonJS output
+          npx tsc knexfile.ts \
+            --module commonjs \
+            --target ES2022 \
+            --moduleResolution node \
+            --skipLibCheck \
+            --declaration false \
+            --sourceMap false
 
       - name: Create deployment package
         working-directory: backend
@@ -116,17 +124,35 @@ jobs:
           echo "=== Checking for required files at root ==="
           unzip -l backend-deploy.zip | grep -E "^\s+[0-9]+\s+[0-9-]+\s+[0-9:]+\s+(package\.json|dist/)" || echo "WARNING: Missing required files"
 
-      - name: Debug - Check knexfile
+      - name: Debug - Check deployment package structure
         working-directory: deploy-package
         run: |
+          echo "=== Deployment package root files ==="
+          ls -la
+          echo ""
+          echo "=== Checking for any .ts files (should be NONE) ==="
+          find . -name "*.ts" -not -name "*.d.ts" | head -20 || echo "No .ts files found (good!)"
+          echo ""
           echo "=== Checking knexfile.js exists ==="
           ls -la knexfile.js || echo "knexfile.js NOT FOUND"
           echo ""
-          echo "=== Last 10 lines of knexfile.js ==="
-          tail -10 knexfile.js
+          echo "=== First 20 lines of knexfile.js ==="
+          head -20 knexfile.js
+          echo ""
+          echo "=== Last 20 lines of knexfile.js ==="
+          tail -20 knexfile.js
           echo ""
           echo "=== Checking migration files ==="
           ls -la dist/database/migrations/
+          echo ""
+          echo "=== First migration file content (first 30 lines) ==="
+          head -30 dist/database/migrations/20250101000001_create_public_schema.js
+          echo ""
+          echo "=== Checking for 'export' keyword in migration files ==="
+          grep -n "^export" dist/database/migrations/*.js || echo "No export statements found (good!)"
+          echo ""
+          echo "=== Checking module.exports in migrations ==="
+          grep -n "module.exports\|exports\." dist/database/migrations/20250101000001_create_public_schema.js | head -5
 
       - name: Run database migrations
         working-directory: deploy-package
