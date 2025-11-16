@@ -2,12 +2,12 @@ name: Azure Naming & Tagging Validation
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master]
     paths:
       - 'infrastructure/**'
       - '.github/workflows/azure-validation.yml'
   pull_request:
-    branches: [main, develop]
+    branches: [master]
     paths:
       - 'infrastructure/**'
 
